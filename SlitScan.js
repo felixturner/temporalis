@@ -5,6 +5,7 @@ SlitScan = function () {
 	this.quality = 7;
 	this.mode = 'vertical';
 	this.throttle = false; //throttle draw FPS to 30
+	this.smoothing = true;
 
 	var lastDrawTime = 0;
 	var camera, scene, renderer;
@@ -17,11 +18,22 @@ SlitScan = function () {
 
 	var texArray;
 
+	var imgTexture1;
+	var imgTexture2;
+
 	var video = document.createElement('video'),
+		
 		canvas = document.createElement('canvas'),
 		ctx = canvas.getContext('2d'),
+		
+		canvas2 = document.createElement('canvas'),
+		ctx2 = canvas2.getContext('2d'),
+
 		bufferCanvas = document.createElement('canvas'),
 		buffCtx = bufferCanvas.getContext('2d'),
+
+		
+
 		frames = [];
 
 	[video, canvas].forEach(function(el){
@@ -52,6 +64,10 @@ SlitScan = function () {
 	imgTexture.minFilter = THREE.LinearFilter;
 	imgTexture.magFilter = THREE.LinearFilter;
 
+	imgTexture2 = new THREE.Texture( canvas2 );
+	imgTexture2.minFilter = THREE.LinearFilter;
+	imgTexture2.magFilter = THREE.LinearFilter;
+
 	// texArray = [];
 	// for (var i = 0; i < me.slices; i++) {
 	// 	var tex = new THREE.Texture( canvas );
@@ -62,7 +78,10 @@ SlitScan = function () {
 
 	uniforms = {
 
-		texture: { type: "t", value: imgTexture },
+		texture1: { type: "t", value: imgTexture },
+		texture2: { type: "t", value: imgTexture2},
+		slices:   { type: "f", value: 60},
+		smoothing:   { type: "i", value: 1}
 
 		//uTexArray : { type: "tv", value: texArray } // texture array (regular)
  
@@ -123,6 +142,10 @@ SlitScan = function () {
 		//canvas is same size as incoming video
 		canvas.width = video.videoWidth || 1;
 		canvas.height = video.videoHeight || 1;
+
+		canvas2.width = video.videoWidth || 1;
+		canvas2.height = video.videoHeight || 1;
+
 		bufferCanvas.width = canvas.width;
 		bufferCanvas.height = canvas.height;
 		video.style.display = 'none';
@@ -212,6 +235,7 @@ SlitScan = function () {
 		if ( video && video.readyState === video.HAVE_ENOUGH_DATA ) {
 			
 			imgTexture.needsUpdate = true;
+			imgTexture2.needsUpdate = true;
 
 			//texArray[0].needsUpdate = true;
 		}
@@ -234,34 +258,70 @@ SlitScan = function () {
 			}
 		}
 
-		//draw slices to canvas
-		for (var i = 0; i < me.slices; i++) {
+		//draw previous slices to canvas2
+		for ( i = 1; i < me.slices; i++) {
 			try {
-				ctx.putImageData(frames[i], 0, 0 , 0, sliceHeight * i , bufferCanvas.width, sliceHeight);
+				
+				//think these are both the same???
+
+				//ctx2.putImageData(frames[i ], 0, 0 , 0, sliceHeight * (i - 1) , bufferCanvas.width, sliceHeight);
+
+
+				ctx2.putImageData(frames[i - 1], 0, 0 , 0, sliceHeight * (i ) , bufferCanvas.width, sliceHeight);
+
+
 			} catch (e) {
 			}
 		}
 
 	}
 
-	function drawHorz() {
+	// function drawHorz() {
 
-		var sliceWidth = canvas.width / me.slices;
+	// 	var sliceWidth = canvas.width / me.slices;
 
-		// save current frame to array
-		buffCtx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight, 0, 0, bufferCanvas.width, bufferCanvas.height);
-		frames.push(buffCtx.getImageData(0, 0, bufferCanvas.width, bufferCanvas.height));
+	// 	// save current frame to array
+	// 	buffCtx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight, 0, 0, bufferCanvas.width, bufferCanvas.height);
+	// 	frames.push(buffCtx.getImageData(0, 0, bufferCanvas.width, bufferCanvas.height));
 
-		//draw slices to canvas
-		for (var i = 0; i < me.slices; i++) {
-			try {
-				ctx.putImageData(frames[i], 0, 0 ,  sliceWidth * i , 0, sliceWidth, bufferCanvas.height );
-			} catch (e) {
-			}
-		}
+	// 	//draw slices to canvas
+	// 	for (var i = 0; i < me.slices; i++) {
+	// 		try {
+	// 			ctx.putImageData(frames[i], 0, 0 ,  sliceWidth * i , 0, sliceWidth, bufferCanvas.height );
+	// 		} catch (e) {
+	// 		}
+	// 	}
 		
-	}
+	// }
 
-	draw();
+	//draw();
+
+	me.saveImage = function() {
+
+		var imgData = renderer.domElement.toDataURL("image/jpeg");    
+
+		if (navigator.userAgent.toLowerCase().indexOf('chrome') > -1){
+			
+			var now = new Date();
+			var stamp = now.getFullYear() + "-" + now.getMonth() + "-" + now.getDate() + "_" + now.getHours() + "." + now.getMinutes() + "." + now.getSeconds();
+			
+			var a = document.createElement('a');
+			a.href = imgData;
+			a.download = "temporalis_" + stamp + ".jpg";
+			a.click();
+
+
+		}else{
+			window.open(imgData);
+		}
+
+	};
+
+	me.updateSmoothing = function(val){
+
+		uniforms.smoothing.value = val ?  1 :  0;
+
+
+	};
 
 };
