@@ -1,12 +1,21 @@
 SlitScan = function () {
 
 	var me = this;
-	this.slices = 70;
+	this.slices = 60;
 	this.quality = 7;
 	this.mode = 'vertical';
 	this.throttle = false; //throttle draw FPS to 30
 
 	var lastDrawTime = 0;
+	var camera, scene, renderer;
+	var videoTexture,planeMaterial;
+	var composer;
+	var renderPass, copyPass;
+	var plane;
+
+	var uniforms;
+
+	var texArray;
 
 	var video = document.createElement('video'),
 		canvas = document.createElement('canvas'),
@@ -22,6 +31,75 @@ SlitScan = function () {
 	canvas.id = 'slit-scan';
 	bufferCanvas.id = 'buffer';
 
+	//INIT THREEJS
+	camera = new THREE.PerspectiveCamera(75, 1080/ 720, 1, 3000);
+	//good distance to fit a 100 x 100 plane in Viewport
+	camera.position.z = 65;
+	//camera.position.z = 68; //give some room around image for glitch effects
+	scene = new THREE.Scene();
+	//image
+	//need to init with an image map or video texture will crap out
+	//imgTexture = THREE.ImageUtils.loadTexture( "badge.png" );
+	
+
+	// planeMaterial = new THREE.MeshBasicMaterial( {
+	// 	map: imgTexture,
+	// 	//wireframe:true,
+	// 	//color: 0xFF00FF
+	// } );
+
+	imgTexture = new THREE.Texture( canvas );
+	imgTexture.minFilter = THREE.LinearFilter;
+	imgTexture.magFilter = THREE.LinearFilter;
+
+	// texArray = [];
+	// for (var i = 0; i < me.slices; i++) {
+	// 	var tex = new THREE.Texture( canvas );
+	// 	tex.minFilter = THREE.LinearFilter;
+	// 	tex.magFilter = THREE.LinearFilter;
+	// 	texArray.push(tex);
+	// }
+
+	uniforms = {
+
+		texture: { type: "t", value: imgTexture },
+
+		//uTexArray : { type: "tv", value: texArray } // texture array (regular)
+ 
+	};
+
+	planeMaterial = new THREE.ShaderMaterial( {
+
+		uniforms: uniforms,
+		vertexShader: document.getElementById( 'vertexShader' ).textContent,
+		fragmentShader: document.getElementById( 'fragmentShader' ).textContent
+
+	} );
+
+
+	//DEBUG
+	//$("#webgl").css("display","block");
+	//Add image plane
+	var planeGeometry = new THREE.PlaneBufferGeometry( 1280/10, 720/10,1,1 );
+	plane = new THREE.Mesh( planeGeometry, planeMaterial );
+	scene.add( plane );
+	//init renderer
+	renderer = new THREE.WebGLRenderer({
+		preserveDrawingBuffer: true 
+	});
+	renderer.setSize( 800, 600 );
+	document.body.appendChild(renderer.domElement);
+	renderer.setClearColor( 0x220000 );
+
+	//post processing
+	// renderPass = new THREE.RenderPass( scene, camera );
+	// copyPass = new THREE.ShaderPass( THREE.CopyShader );
+	// composer = new THREE.EffectComposer( renderer);
+	// composer.addPass( renderPass );
+	// composer.addPass( copyPass );
+	// copyPass.renderToScreen = true;
+
+
 	//add stats
 	stats = new Stats();
 	document.body.appendChild(stats.domElement);
@@ -36,17 +114,26 @@ SlitScan = function () {
 
 	function onResize(){
 		video.style.display = 'block';
-		var scale = Math.min(window.innerWidth / video.offsetWidth, window.innerHeight / video.offsetHeight);
+		var scale = 0.1;//Math.min(window.innerWidth / video.offsetWidth, window.innerHeight / video.offsetHeight);
+		
 		canvas.style.width = video.offsetWidth * scale + 'px';
 		canvas.style.height = video.offsetHeight * scale + 'px';
-		canvas.style.left = window.innerWidth * 0.5 - video.offsetWidth * scale * 0.5 + 'px';
-		canvas.style.top = window.innerHeight * 0.5 - video.offsetHeight * scale * 0.5 + 'px';
+		canvas.style.left = '100px';//window.innerWidth * 0.5 - video.offsetWidth * scale * 0.5 + 'px';
+		canvas.style.top = 0;//window.innerHeight * 0.5 - video.offsetHeight * scale * 0.5 + 'px';
 		//canvas is same size as incoming video
 		canvas.width = video.videoWidth || 1;
 		canvas.height = video.videoHeight || 1;
 		bufferCanvas.width = canvas.width;
 		bufferCanvas.height = canvas.height;
 		video.style.display = 'none';
+
+		//resize threejs
+		var renderSize = new THREE.Vector2(window.innerWidth,window.innerHeight);
+		camera.aspect = renderSize.x / renderSize.y;
+		camera.updateProjectionMatrix();
+		renderer.setSize( renderSize.x,renderSize.y);
+		//if (composer) composer.setSize(renderSize.x,renderSize.y );
+
 	}
 	this.resize = onResize;
 	window.addEventListener('resize', onResize);
@@ -67,14 +154,30 @@ SlitScan = function () {
 			onResize();
 		});
 		video.src = window.URL.createObjectURL(localMediaStream);
-		setTimeout(function(){
-			video.play();
-		}, 500);
+		setTimeout(onCamEnabled, 500);
 	}, function (e) {
 		if (e.code === 1) {
 			console.log('User declined permissions.', e);
 		}
 	});
+
+	var onCamEnabled = function(){
+
+
+		console.log('ppp');
+
+		video.play();
+
+		//init video texture
+		// videoTexture = new THREE.Texture( canvas );
+		// videoTexture.minFilter = THREE.LinearFilter;
+		// videoTexture.magFilter = THREE.LinearFilter;
+
+		// planeMaterial.map = videoTexture;
+		// planeMaterial.needsUpdate = true;
+
+
+	};
 
 	var update = function(){
 
@@ -87,6 +190,8 @@ SlitScan = function () {
 		}else{
 			draw();
 		}
+
+		renderer.render( scene, camera);
 		stats.update();
 		requestAnimationFrame(update);
 
@@ -104,6 +209,13 @@ SlitScan = function () {
 			frames.shift();
 		}
 
+		if ( video && video.readyState === video.HAVE_ENOUGH_DATA ) {
+			
+			imgTexture.needsUpdate = true;
+
+			//texArray[0].needsUpdate = true;
+		}
+
 	};
 
 	function drawVert() {
@@ -111,8 +223,16 @@ SlitScan = function () {
 		var sliceHeight = canvas.height / me.slices;
 
 		// save current frame to array
-		buffCtx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight, 0, 0, bufferCanvas.width, bufferCanvas.height);
+		buffCtx.drawImage(video, 0, 0);
 		frames.push(buffCtx.getImageData(0, 0, bufferCanvas.width, bufferCanvas.height));
+
+		//draw slices to canvas
+		for (var i = 0; i < me.slices; i++) {
+			try {
+				ctx.putImageData(frames[i], 0, 0 , 0, sliceHeight * i , bufferCanvas.width, sliceHeight);
+			} catch (e) {
+			}
+		}
 
 		//draw slices to canvas
 		for (var i = 0; i < me.slices; i++) {
