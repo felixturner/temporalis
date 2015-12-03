@@ -164,6 +164,12 @@ SlitScan = function () {
 	navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
 	navigator.getUserMedia({
 		video: {
+
+			//most webcam capture at max 30 fps
+			//mandatory: {
+			//minFrameRate: 31
+			//},
+
 			optional: [
 				//request hi-rez capture
 				{ minWidth: 1280 },
@@ -179,9 +185,7 @@ SlitScan = function () {
 		video.src = window.URL.createObjectURL(localMediaStream);
 		setTimeout(onCamEnabled, 500);
 	}, function (e) {
-		if (e.code === 1) {
-			console.log('User declined permissions.', e);
-		}
+		console.log( e);
 	});
 
 	var onCamEnabled = function(){
