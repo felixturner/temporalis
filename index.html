@@ -74,12 +74,10 @@
 			
 		</style>
 
-		<!-- SIMPLE IMAGE SHADER -->
+		<!-- ShaderMaterial Source -->
 
 		<script id="vertexShader" type="x-shader/x-vertex">
-
 			varying vec2 vUv;
-
 			void main()
 			{
 				vUv = uv;
@@ -94,43 +92,39 @@
 			uniform sampler2D texture2;
 			uniform float slices;
 			uniform int smoothing; //0 = false, 1 = true
-
-			//uniform sampler2D uTexArray[ 32 ];
-
+			uniform int direction; //0 = vert, 1 = horiz
 			varying vec2 vUv;
 
 			void main() {
 
+				//horizontal mirror
+				vec2 uv = vUv;
+				uv.x = 1.0 - uv.x;
 
 				if (smoothing == 1){
 
-					//gl_FragColor = vec4(1.0,0,0,1.0);
-
-
 					//create gradient stripes
-					float mixAmt = fract(vUv.y * slices);
-
-					//test
-					//gl_FragColor = vec4(mixAmt,0,0,1.0);
-
+					float mixAmt;
+					if (direction == 0){
+						mixAmt = fract(uv.y * slices);
+					}else{
+						mixAmt = fract((1.0 - uv.x) * slices);
+					}
+					
 					//mix frames based on gradient stripes
-					vec4 texel1 = texture2D( texture1, vUv );
-					vec4 texel2 = texture2D( texture2, vUv );
+					vec4 texel1 = texture2D( texture1, uv );
+					vec4 texel2 = texture2D( texture2, uv );
 					gl_FragColor = mix( texel1, texel2, mixAmt);
+
+					//debug
+					//vec4 mixCol = vec4(mixAmt,0,0,1.0);
+					//gl_FragColor = mix( texel1, mixCol, 0.5);
 
 
 				} else{
-
-					gl_FragColor = texture2D(texture1, vUv);
-
-					//gl_FragColor = vec4(0,1.0,0,1.0);
-
-
+					//passthru
+					gl_FragColor = texture2D(texture1, uv);
 				}
-
-
-
-
 			}
 
 		</script>
@@ -142,11 +136,12 @@
 			window.onload = function () {
 
 				ss = new SlitScan();
+				ss.init();
 
 				var gui = new dat.GUI();
-				gui.add(ss, 'slices', 0, 400);
-				gui.add(ss, 'mode', ['vertical', 'horizontal']);
-				gui.add(ss, 'smoothing',true ).onChange(ss.updateSmoothing);
+				gui.add(ss, 'slices', 10, 400).onChange(ss.updateUniforms);
+				gui.add(ss, 'mode', ['vertical', 'horizontal']).onChange(ss.updateUniforms);
+				gui.add(ss, 'smoothing',true ).onChange(ss.updateUniforms);
 				gui.add(ss, 'throttle',false);
 				gui.add({
 					fullscreen: function(){
@@ -163,8 +158,9 @@
 
 						//window.open(document.querySelector('#slit-scan').toDataURL(), '_blank');
 
-					}
-				}, "save");
+						}
+					}, "save");
+
 			};
 
 			var _gaq = _gaq || [];
@@ -179,6 +175,7 @@
 				var s = document.getElementsByTagName('script')[0];
 				s.parentNode.insertBefore(ga, s);
 			})();
+
 
 		</script>
 	</head>
